@@ -1,91 +1,3 @@
-import { McpServer } from '@modelcontextprotocol/server';
-import { loadConfig } from './config';
-import { handleError } from './middleware/errorHandler';
-import { validateSearchParams, validateCodeAnalysisParams } from './middleware/validation';
-import { searchDocumentation } from './handlers/searchHandler';
-import { analyzeCode } from './handlers/codeAnalysisHandler';
-import { SearchParams, CodeAnalysisParams } from './types';
-
-export class DocumentationServer {
-    private server: McpServer;
-    private config: ReturnType<typeof loadConfig>;
-
-    constructor() {
-        this.config = loadConfig();
-        this.server = new McpServer({
-            name: 'mcp-documentation-server',
-            version: '1.0.0'
-        });
-        this.setupFunctions();
-    }
-
-    private setupFunctions(): void {
-        // Search documentation function
-        this.server.addFunction({
-            name: 'search_documentation',
-            description: 'Search for documentation using Brave Search',
-            parameters: {
-                type: 'object',
-                properties: {
-                    query: {
-                        type: 'string',
-                        description: 'The search query'
-                    },
-                    framework: {
-                        type: 'string',
-                        description: 'Optional framework name'
-                    },
-                    version: {
-                        type: 'string',
-                        description: 'Optional framework version'
-                    }
-                },
-                required: ['query']
-            },
-            handler: async (params: SearchParams) => {
-                try {
-                    validateSearchParams(params);
-                    const results = await searchDocumentation(params);
-                    return { success: true, results };
-                } catch (error) {
-                    return handleError(error);
-                }
-            }
-        });
-
-        // Code analysis function
-        this.server.addFunction({
-            name: 'analyze_code',
-            description: 'Analyze code and provide suggestions',
-            parameters: {
-                type: 'object',
-                properties: {
-                    code: {
-                        type: 'string',
-                        description: 'The code to analyze'
-                    },
-                    language: {
-                        type: 'string',
-                        description: 'Programming language'
-                    },
-                    framework: {
-                        type: 'string',
-                        description: 'Optional framework name'
-                    }
-                },
-                required: ['code', 'language']
-            },
-            handler: async (params: CodeAnalysisParams) => {
-                try {
-                    validateCodeAnalysisParams(params);
-                    const analysis = await analyzeCode(params);
-                    return { success: true, analysis };
-                } catch (error) {
-                    return handleError(error);
-                }
-            }
-        });
-
         // Status function
         this.server.addFunction({
             name: 'get_status',
@@ -95,13 +7,21 @@ export class DocumentationServer {
                 properties: {}
             },
             handler: async () => {
+                const health = healthChecker.getStatus();
+                const cacheStats = cacheManager.getStats();
+                const currentMetrics = metrics.getMetrics();
+
                 return {
-                    status: 'operational',
-                    version: '1.0.0',
-                    capabilities: [
-                        'documentation_search',
-                        'code_analysis'
-                    ],
+                    status: health.status,
+                    version: health.version,
+                    uptime: health.uptime,
+                    metrics: currentMetrics,
+                    cache: cacheStats,
+                    rateLimits: {
+                        search: rateLimiter.getRemainingRequests('search'),
+                        analyze: rateLimiter.getRemainingRequests('analyze')
+                    },
+                    lastError: health.lastError,
                     config: {
                         updateInterval: this.config.updateInterval,
                         cacheDuration: this.config.cacheDuration,
@@ -110,24 +30,74 @@ export class DocumentationServer {
                 };
             }
         });
+
+        // System monitoring function
+        this.server.addFunction({
+            name: 'get_system_metrics',
+            description: 'Get detailed system metrics and performance data',
+            parameters: {
+                type: 'object',
+                properties: {}
+            },
+            handler: async () => {
+                return {
+                    process: {
+                        memory: process.memoryUsage(),
+                        cpu: process.cpuUsage(),
+                        uptime: process.uptime(),
+                        pid: process.pid
+                    },
+                    metrics: metrics.getMetrics(),
+                    health: healthChecker.getStatus(),
+                    cache: cacheManager.getStats(),
+                    rateLimits: {
+                        search: rateLimiter.getRemainingRequests('search'),
+                        analyze: rateLimiter.getRemainingRequests('analyze')
+                    }
+                };
+            }
+        });
     }
 
     public async start(): Promise<void> {
         try {
+            // Start periodic cleanup
+            this.startCleanupInterval();
+
+            // Start the server
             await this.server.listen(this.config.port);
-            console.log(`MCP Documentation Server is running on port ${this.config.port}`);
+            logger.info(`MCP Documentation Server started on port ${this.config.port}`);
         } catch (error) {
-            console.error('Failed to start server:', error);
+            logger.error('Failed to start server:', error);
             process.exit(1);
         }
+    }
+
+    private startCleanupInterval(): void {
+        setInterval(() => {
+            try {
+                // Reset metrics every hour
+                metrics.reset();
+
+                // Log current status
+                const health = healthChecker.getStatus();
+                logger.info('System status:', { health });
+
+                // Log cache stats
+                const cacheStats = cacheManager.getStats();
+                logger.info('Cache stats:', { cacheStats });
+            } catch (error) {
+                logger.error('Error in cleanup interval:', error);
+            }
+        }, this.config.updateInterval);
     }
 
     public async stop(): Promise<void> {
         try {
             await this.server.close();
-            console.log('Server stopped');
+            logger.info('Server stopped');
         } catch (error) {
-            console.error('Error stopping server:', error);
+            logger.error('Error stopping server:', error);
             throw error;
         }
     }
