@@ -1,14 +1,10 @@
-import express, { Express, Request, Response } from 'express';
+import express, { Express } from 'express';
 import cors from 'cors';
 import compression from 'compression';
+import helmet from 'helmet';
 import { loadConfig } from './config';
-import { handleError } from './middleware/errorHandler';
-import { validateSearchParams, validateCodeAnalysisParams } from './middleware/validation';
-import { searchDocumentation } from './handlers/searchHandler';
-import { analyzeCode } from './handlers/codeAnalysisHandler';
-import { SearchParams, CodeAnalysisParams } from './types';
-import { rateLimiter } from './utils/rateLimit';
-import { cacheManager } from './utils/cache';
+import routes from './routes';
+import { errorHandler } from './middleware/errorHandler';
 import { metrics } from './utils/metrics';
 import { healthChecker } from './utils/health';
 import logger from './utils/logger';
@@ -23,124 +19,62 @@ export class DocumentationServer {
         this.app = express();
         this.setupMiddleware();
         this.setupRoutes();
+        this.setupErrorHandling();
     }
 
     private setupMiddleware(): void {
+        // Basic middleware
         this.app.use(cors());
+        this.app.use(helmet());
         this.app.use(compression());
         this.app.use(express.json());
+
+        // Request logging
+        this.app.use((req, res, next) => {
+            const startTime = Date.now();
+            logger.info(`${req.method} ${req.url} started`);
+
+            res.on('finish', () => {
+                const duration = Date.now() - startTime;
+                logger.info(`${req.method} ${req.url} ${res.statusCode} - ${duration}ms`);
+                metrics.recordTiming('request_duration', duration);
+            });
+
+            next();
+        });
     }
 
     private setupRoutes(): void {
-        // Search documentation endpoint
-        this.app.post('/api/search', async (req: Request, res: Response) => {
-            const startTime = Date.now();
-            try {
-                if (!rateLimiter.isAllowed('search')) {
-                    throw new Error('Rate limit exceeded');
-                }
+        this.app.use(routes);
 
-                const params = req.body as SearchParams;
-                validateSearchParams(params);
-
-                const cachedResults = cacheManager.getSearchResults(params);
-                if (cachedResults) {
-                    metrics.increment('cache_hits');
-                    return res.json({ success: true, results: cachedResults });
-                }
-
-                metrics.increment('searches');
-                const results = await searchDocumentation(params);
-                cacheManager.setSearchResults(params, results);
-                metrics.recordTiming('search_duration', Date.now() - startTime);
-
-                res.json({ success: true, results });
-            } catch (error) {
-                metrics.increment('errors');
-                healthChecker.recordError(error);
-                res.status(500).json(handleError(error));
-            }
+        // Health check endpoint
+        this.app.get('/health', (req, res) => {
+            res.json(healthChecker.getStatus());
         });
+    }
 
-        // Code analysis endpoint
-        this.app.post('/api/analyze', async (req: Request, res: Response) => {
-            const startTime = Date.now();
-            try {
-                if (!rateLimiter.isAllowed('analyze')) {
-                    throw new Error('Rate limit exceeded');
-                }
-
-                const params = req.body as CodeAnalysisParams;
-                validateCodeAnalysisParams(params);
-
-                const cachedResults = cacheManager.getAnalysisResults(params);
-                if (cachedResults) {
-                    metrics.increment('cache_hits');
-                    return res.json({ success: true, analysis: cachedResults });
-                }
-
-                metrics.increment('analyses');
-                const analysis = await analyzeCode(params);
-                cacheManager.setAnalysisResults(params, analysis);
-                metrics.recordTiming('analysis_duration', Date.now() - startTime);
-
-                res.json({ success: true, analysis });
-            } catch (error) {
-                metrics.increment('errors');
-                healthChecker.recordError(error);
-                res.status(500).json(handleError(error));
-            }
-        });
-
-        // Status endpoint
-        this.app.get('/api/status', (req: Request, res: Response) => {
-            const health = healthChecker.getStatus();
-            const cacheStats = cacheManager.getStats();
-            const currentMetrics = metrics.getMetrics();
-
-            res.json({
-                status: health.status,
-                version: health.version,
-                uptime: health.uptime,
-                metrics: currentMetrics,
-                cache: cacheStats,
-                rateLimits: {
-                    search: rateLimiter.getRemainingRequests('search'),
-                    analyze: rateLimiter.getRemainingRequests('analyze')
-                },
-                lastError: health.lastError,
-                config: {
-                    updateInterval: this.config.updateInterval,
-                    cacheDuration: this.config.cacheDuration,
-                    debugMode: this.config.debugMode
+    private setupErrorHandling(): void {
+        // 404 handler
+        this.app.use((req, res) => {
+            res.status(404).json({
+                success: false,
+                error: {
+                    code: 'NOT_FOUND',
+                    message: 'Resource not found'
                 }
             });
         });
 
-        // System metrics endpoint
-        this.app.get('/api/metrics', (req: Request, res: Response) => {
-            res.json({
-                process: {
-                    memory: process.memoryUsage(),
-                    cpu: process.cpuUsage(),
-                    uptime: process.uptime(),
-                    pid: process.pid
-                },
-                metrics: metrics.getMetrics(),
-                health: healthChecker.getStatus(),
-                cache: cacheManager.getStats(),
-                rateLimits: {
-                    search: rateLimiter.getRemainingRequests('search'),
-                    analyze: rateLimiter.getRemainingRequests('analyze')
-                }
-            });
-        });
+        // Error handler
+        this.app.use(errorHandler);
     }
 
     public async start(): Promise<void> {
         try {
+            // Start cleanup interval
             this.startCleanupInterval();
-            
+
+            // Start server
             return new Promise((resolve) => {
                 this.server = this.app.listen(this.config.port, () => {
                     logger.info(`Documentation Server started on port ${this.config.port}`);
@@ -159,8 +93,6 @@ export class DocumentationServer {
                 metrics.reset();
                 const health = healthChecker.getStatus();
                 logger.info('System status:', { health });
-                const cacheStats = cacheManager.getStats();
-                logger.info('Cache stats:', { cacheStats });
             } catch (error) {
                 logger.error('Error in cleanup interval:', error);
             }
