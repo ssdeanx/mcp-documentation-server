@@ -1,65 +1,27 @@
-import { McpServer } from '@modelcontextprotocol/server';
+import { DocumentationServer } from './server';
 
-// Initialize the MCP server
-const server = new McpServer({
-    name: 'mcp-documentation-server',
-    version: '1.0.0'
+async function main() {
+    const server = new DocumentationServer();
+    
+    // Handle graceful shutdown
+    process.on('SIGTERM', async () => {
+        console.log('Received SIGTERM signal');
+        await server.stop();
+        process.exit(0);
+    });
+
+    process.on('SIGINT', async () => {
+        console.log('Received SIGINT signal');
+        await server.stop();
+        process.exit(0);
+    });
+
+    // Start server
+    await server.start();
+}
+
+// Start the application
+main().catch(error => {
+    console.error('Fatal error:', error);
+    process.exit(1);
 });
-
-// Add functions to the server
-server.addFunction({
-    name: 'search_documentation',
-    description: 'Search for documentation using Brave Search',
-    parameters: {
-        type: 'object',
-        properties: {
-            query: {
-                type: 'string',
-                description: 'The search query'
-            },
-            framework: {
-                type: 'string',
-                description: 'Optional framework name'
-            },
-            version: {
-                type: 'string',
-                description: 'Optional framework version'
-            }
-        },
-        required: ['query']
-    },
-    handler: async (params) => {
-        // Implementation
-        return { results: [] };
-    }
-});
-
-server.addFunction({
-    name: 'analyze_code',
-    description: 'Analyze code and provide suggestions',
-    parameters: {
-        type: 'object',
-        properties: {
-            code: {
-                type: 'string',
-                description: 'The code to analyze'
-            },
-            language: {
-                type: 'string',
-                description: 'Programming language'
-            },
-            framework: {
-                type: 'string',
-                description: 'Optional framework name'
-            }
-        },
-        required: ['code', 'language']
-    },
-    handler: async (params) => {
-        // Implementation
-        return { analysis: {} };
-    }
-});
-
-// Start the server
-server.listen();
