@@ -16,7 +16,36 @@ A smart documentation server that provides AI-assisted code improvement and docu
 - **Brave Search Integration**: Smart documentation search and retrieval
 - **Learning System**: Improves suggestions over time
 
-## Installation
+## Quick Start
+
+1. Install the package:
+```bash
+npm install -g mcp-documentation-server
+```
+
+2. Configure Claude Desktop (config.json):
+```json
+{
+  "mcpServers": {
+    "documentation": {
+      "command": "npx",
+      "args": ["-y", "mcp-documentation-server"],
+      "env": {
+        "BRAVE_API_KEY": "<YOUR_BRAVE_API_KEY>"
+      }
+    }
+  }
+}
+```
+
+3. Start using with Claude:
+```
+Claude, search documentation for Next.js App Router
+```
+
+For detailed setup instructions, see [Claude Desktop Setup Guide](docs/CLAUDE_DESKTOP_SETUP.md)
+
+## Development Setup
 
 1. Clone the repository:
 ```bash
@@ -37,82 +66,45 @@ CACHE_DURATION=86400000
 BRAVE_API_KEY=your_brave_api_key
 ```
 
-4. Start the server:
+4. Start the development server:
 ```bash
 npm run dev
 ```
 
-## Claude Desktop Integration
+## Documentation
 
-### Prerequisites
-- Claude Desktop App installed
-- MCP Documentation Server running
+- [Usage Guide](docs/USAGE.md)
+- [Claude Desktop Setup](docs/CLAUDE_DESKTOP_SETUP.md)
+- [API Documentation](docs/API.md)
+- [Contributing Guide](CONTRIBUTING.md)
 
-### Setup Steps
+## Using with Claude Desktop
 
-1. Open Claude Desktop settings
-2. Navigate to the Tools section
-3. Add new MCP server with your local server URL:
-   ```
-   http://localhost:3000
-   ```
-4. Enable the following capabilities:
-   - File System Access
-   - Brave Search
-   - Knowledge Base
-
-### Usage with Claude
-
-Once integrated, you can use commands like:
+### Basic Commands
 
 ```
-Claude, search documentation for Next.js App Router
+Claude, search documentation for React hooks
 ```
-
-or
 
 ```
 Claude, analyze this Python code and suggest improvements...
 ```
 
-## API Documentation
-
-### Framework Documentation Search
-
-```typescript
-const docSystem = new DocumentationProcessor(BRAVE_API_KEY);
-
-// Search Next.js documentation
-const nextjsDocs = await docSystem.processNextjsDocumentation('app router');
-
-// Search Python documentation
-const pythonDocs = await docSystem.processPythonDocumentation('asyncio');
+```
+Claude, find best practices for Next.js App Router
 ```
 
-### Code Analysis
+### Advanced Usage
 
-```typescript
-const analyzer = new PythonAnalyzer();
-
-// Analyze Python code
-const analysis = analyzer.analyze(pythonCode);
-console.log(analysis.typing.typeHints);
-console.log(analysis.async.asyncFunctions);
+```
+Claude, search for documentation about async/await in Python 3.9
 ```
 
-## Testing
-
-Run the test suite:
-
-```bash
-npm test
+```
+Claude, analyze this code for security issues and suggest fixes...
 ```
 
-Run specific tests:
-
-```bash
-npm test -- tests/integration/BraveSearchIntegration.test.ts
-```
+For more examples, see the [Usage Guide](docs/USAGE.md)
 
 ## Contributing
 
@@ -130,6 +122,20 @@ npm test -- tests/integration/BraveSearchIntegration.test.ts
    git push origin feature/amazing-feature
    ```
 5. Open a Pull Request
+
+## Testing
+
+Run the test suite:
+
+```bash
+npm test
+```
+
+Run specific tests:
+
+```bash
+npm test -- tests/integration/BraveSearchIntegration.test.ts
+```
 
 ## License
 
