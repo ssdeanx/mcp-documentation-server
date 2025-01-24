@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const search_1 = require("../controllers/search");
+const rateLimit_1 = require("../middleware/rateLimit");
+const cache_1 = require("../middleware/cache");
+const validation_1 = require("../middleware/validation");
+const router = (0, express_1.Router)();
+router.post('/', (0, rateLimit_1.rateLimitMiddleware)('search'), validation_1.validateSearch, (0, cache_1.cacheMiddleware)('search'), search_1.searchController);
+exports.default = router;

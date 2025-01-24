@@ -1,0 +1,35 @@
+export declare class PythonAnalyzer {
+    constructor();
+    analyze(code: string): any;
+    private analyzeSyntax;
+    private analyzeImports;
+    private analyzeFunctions;
+    private analyzeClasses;
+    private analyzeAsyncCode;
+    private analyzeTyping;
+    private analyzePythonBestPractices;
+    private detectPythonVersion;
+    private detectSyntaxFeatures;
+    private findStandardLibraryImports;
+    private findThirdPartyImports;
+    private findLocalImports;
+    private analyzeImportStyle;
+    private findFunctionDefinitions;
+    private findDecorators;
+    private analyzeParameters;
+    private analyzeReturnTypes;
+    private findClassDefinitions;
+    private analyzeInheritance;
+    private analyzeMethods;
+    private analyzeProperties;
+    private findAsyncFunctions;
+    private findAwaitUsage;
+    private findCoroutines;
+    private findTypeHints;
+    private findTypeAliases;
+    private findGenerics;
+    private checkPEP8Compliance;
+    private analyzeDocstrings;
+    private analyzeErrorHandling;
+    private analyzeCodeOrganization;
+}
